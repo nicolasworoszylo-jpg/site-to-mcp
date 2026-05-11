@@ -69,7 +69,8 @@ export type ModuleName =
   | 'indexnow-push'
   | 'hreflang-validator'
   | 'canonical-validator'
-  | 'lighthouse-audit';
+  | 'lighthouse-audit'
+  | 'outreach-generator';
 
 export interface ModuleRunResult {
   module: ModuleName;

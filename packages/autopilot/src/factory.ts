@@ -24,6 +24,7 @@ import {
   HreflangValidatorModule,
   CanonicalValidatorModule,
   LighthouseAuditModule,
+  OutreachGeneratorModule,
 } from './modules/index.js';
 import { Scheduler } from './scheduler/cron.js';
 import { generateWeeklyReport } from './reports/markdown.js';
@@ -48,6 +49,7 @@ export class Autopilot {
     'hreflang-validator': HreflangValidatorModule;
     'canonical-validator': CanonicalValidatorModule;
     'lighthouse-audit': LighthouseAuditModule;
+    'outreach-generator': OutreachGeneratorModule;
   };
   private scheduler: Scheduler;
 
@@ -76,6 +78,7 @@ export class Autopilot {
       'hreflang-validator': new HreflangValidatorModule(this.storage, config),
       'canonical-validator': new CanonicalValidatorModule(this.storage, config),
       'lighthouse-audit': new LighthouseAuditModule(this.storage, config),
+      'outreach-generator': new OutreachGeneratorModule(this.storage, config),
     };
   }
 

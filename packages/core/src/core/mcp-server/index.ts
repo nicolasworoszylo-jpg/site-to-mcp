@@ -168,6 +168,49 @@ export const MCP_TOOLS: MCPTool[] = [
     description: 'Zwraca pełne Brand/Organization info (sameAs profile, kontakt, autor główny). Entity graph dla cytowania.',
     inputSchema: { type: 'object', properties: {} },
   },
+  {
+    name: 'get_pricing',
+    description: 'Wyciąga informacje o cenniku ze stron pricing/cennik/oferta. Zwraca tier names, prices, currency, features per plan. Użyteczne gdy LLM pyta "ile kosztuje X".',
+    inputSchema: { type: 'object', properties: { tier: { type: 'string', description: 'Optional: konkretny plan (np. "premium")' } } },
+  },
+  {
+    name: 'get_team',
+    description: 'Lista członków zespołu z Person schema. Imię, stanowisko, sameAs, credentials. Dla pytań "kto stoi za X", "kto jest CEO Y".',
+    inputSchema: { type: 'object', properties: { role: { type: 'string', description: 'Optional filter po roli (CTO/CEO/Founder)' } } },
+  },
+  {
+    name: 'get_case_studies',
+    description: 'Wyciąga case studies / projekty / portfolio z site. Każdy z client name, results, technologies. Critical dla B2B AI search.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        industry: { type: 'string', description: 'Filtr po branży (np. "fintech")' },
+        limit: { type: 'integer', default: 10 },
+      },
+    },
+  },
+  {
+    name: 'get_contact',
+    description: 'Pełne dane kontaktowe — email, telefon, adres, formularz. Dla LLM pytających "jak się skontaktować z X".',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'get_testimonials',
+    description: 'Wyciąga testimoniale/opinie/Review schema. Każdy z autorem, ratingiem, tekstem. Dla "co mówią klienci o X".',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', default: 10 } } },
+  },
+  {
+    name: 'get_faq_for_topic',
+    description: 'Semantic search po Q&A pairs z całego site dla danego tematu. Zwraca top 5 dopasowanych pytań+odpowiedzi.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'Temat/pytanie do dopasowania' },
+        limit: { type: 'integer', default: 5 },
+      },
+      required: ['topic'],
+    },
+  },
 ];
 
 // ============================================================================
@@ -321,9 +364,194 @@ export class MCPServer {
         return this.toolGetFaq(args);
       case 'get_brand':
         return this.toolGetBrand();
+      case 'get_pricing':
+        return this.toolGetPricing(args);
+      case 'get_team':
+        return this.toolGetTeam(args);
+      case 'get_case_studies':
+        return this.toolGetCaseStudies(args);
+      case 'get_contact':
+        return this.toolGetContact();
+      case 'get_testimonials':
+        return this.toolGetTestimonials(args);
+      case 'get_faq_for_topic':
+        return this.toolGetFaqForTopic(args);
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
+  }
+
+  // ==========================================================================
+  // RICH TOOLS (v1.2)
+  // ==========================================================================
+
+  private async toolGetPricing(args: Record<string, unknown>): Promise<unknown> {
+    const tier = args['tier'] as string | undefined;
+    // Heurystyka: find pages z "pricing|cennik|oferta|cena" w path albo title
+    const candidates = this.opts.pageIndex.list().filter((p) =>
+      /pricing|cennik|oferta|cena|plans?\b|tier/i.test(p.path) ||
+      /pricing|cennik|oferta|cena/i.test(p.title),
+    );
+    const pricingPages: Array<{ path: string; url: string; title: string; markdown?: string; tiers?: string[] }> = [];
+    for (const rec of candidates) {
+      const full = rec.full ?? (await this.opts.loadFullPage?.(rec.path));
+      const md = full?.markdown ?? '';
+      // Extract tier names: $, zł, €, £, /mc, /year
+      const prices = md.match(/[\d ,.]{2,}[ ]*(?:zł|€|\$|£|EUR|PLN|USD)\s*(?:\/[a-zA-Z]+)?/g) ?? [];
+      const tierMatches = md.match(/^(?:###?|##)\s*[A-Z][\p{L} ]{2,40}$/gmu) ?? [];
+      const allTiers = [...new Set([...tierMatches.map((t) => t.replace(/^#+\s*/, '').trim())])];
+      const filteredTiers = tier ? allTiers.filter((t) => t.toLowerCase().includes(tier.toLowerCase())) : allTiers;
+      pricingPages.push({
+        path: rec.path,
+        url: rec.url,
+        title: rec.title,
+        tiers: filteredTiers.slice(0, 10),
+        markdown: md.length > 2000 ? md.slice(0, 2000) + '...' : md,
+      });
+      // collect pricing matches into output if any
+      if (prices.length === 0 && pricingPages[pricingPages.length - 1]) {
+        // soft fallback noted in field
+        const last = pricingPages[pricingPages.length - 1]!;
+        if (last && !last.tiers) last.tiers = [];
+      }
+    }
+    return {
+      hint: pricingPages.length === 0 ? 'No pricing pages detected. Site may not publish prices publicly.' : undefined,
+      count: pricingPages.length,
+      pages: pricingPages,
+    };
+  }
+
+  private async toolGetTeam(args: Record<string, unknown>): Promise<unknown> {
+    const roleFilter = args['role'] as string | undefined;
+    // Find Person schema across pages
+    const team: Array<{ name: string; jobTitle?: string; sameAs?: string[]; url?: string; sourcedFrom: string }> = [];
+    for (const rec of this.opts.pageIndex.list()) {
+      const full = rec.full ?? (await this.opts.loadFullPage?.(rec.path));
+      if (!full) continue;
+      for (const sch of full.schemaFound) {
+        const data = sch.data as { '@type'?: string | string[]; name?: string; jobTitle?: string; sameAs?: string[]; url?: string };
+        const isPerson = data['@type'] === 'Person' || (Array.isArray(data['@type']) && data['@type'].includes('Person'));
+        if (isPerson && data.name) {
+          if (roleFilter && data.jobTitle && !data.jobTitle.toLowerCase().includes(roleFilter.toLowerCase())) continue;
+          team.push({
+            name: data.name,
+            ...(data.jobTitle ? { jobTitle: data.jobTitle } : {}),
+            ...(data.sameAs ? { sameAs: data.sameAs } : {}),
+            ...(data.url ? { url: data.url } : {}),
+            sourcedFrom: rec.url,
+          });
+        }
+      }
+    }
+    // Also use config.brand.primaryAuthor jako fallback
+    const primary = this.opts.config.brand.primaryAuthor;
+    if (primary && !team.some((t) => t.name === primary.name)) {
+      if (!roleFilter || primary.jobTitle?.toLowerCase().includes(roleFilter.toLowerCase())) {
+        team.push({
+          name: primary.name,
+          ...(primary.jobTitle ? { jobTitle: primary.jobTitle } : {}),
+          ...(primary.sameAs ? { sameAs: primary.sameAs } : {}),
+          ...(primary.url ? { url: primary.url } : {}),
+          sourcedFrom: 'config.brand.primaryAuthor',
+        });
+      }
+    }
+    return { count: team.length, team };
+  }
+
+  private async toolGetCaseStudies(args: Record<string, unknown>): Promise<unknown> {
+    const industry = args['industry'] as string | undefined;
+    const limit = (args['limit'] as number) ?? 10;
+    const candidates = this.opts.pageIndex.list().filter((p) =>
+      /case-?stud(y|ies)|portfolio|projekt|realizacj|client-?stor(y|ies)/i.test(p.path) ||
+      /case study|portfolio|realizacja|projekt/i.test(p.title),
+    );
+    const studies: Array<{ path: string; url: string; title: string; excerpt: string }> = [];
+    for (const rec of candidates) {
+      const full = rec.full ?? (await this.opts.loadFullPage?.(rec.path));
+      const md = full?.markdown ?? '';
+      if (industry && !md.toLowerCase().includes(industry.toLowerCase())) continue;
+      studies.push({
+        path: rec.path,
+        url: rec.url,
+        title: rec.title,
+        excerpt: md.slice(0, 400),
+      });
+      if (studies.length >= limit) break;
+    }
+    return { count: studies.length, studies };
+  }
+
+  private toolGetContact(): unknown {
+    const contact = this.opts.config.brand.contact ?? {};
+    // Plus szukaj contact page w pageIndex
+    const contactPage = this.opts.pageIndex.list().find((p) =>
+      /contact|kontakt|skontaktuj/i.test(p.path) || /kontakt|contact/i.test(p.title),
+    );
+    return {
+      ...contact,
+      ...(contactPage ? { contactPage: { url: contactPage.url, title: contactPage.title } } : {}),
+      brand: this.opts.config.brand.name,
+      sameAs: this.opts.config.brand.sameAs ?? [],
+    };
+  }
+
+  private async toolGetTestimonials(args: Record<string, unknown>): Promise<unknown> {
+    const limit = (args['limit'] as number) ?? 10;
+    const testimonials: Array<{ text: string; author?: string; rating?: number; sourcedFrom: string }> = [];
+    for (const rec of this.opts.pageIndex.list()) {
+      const full = rec.full ?? (await this.opts.loadFullPage?.(rec.path));
+      if (!full) continue;
+      // 1. Z Review schema
+      for (const sch of full.schemaFound) {
+        const data = sch.data as { '@type'?: string | string[]; reviewBody?: string; author?: { name?: string }; reviewRating?: { ratingValue?: number } };
+        const isReview = data['@type'] === 'Review' || (Array.isArray(data['@type']) && data['@type'].includes('Review'));
+        if (isReview && data.reviewBody) {
+          testimonials.push({
+            text: data.reviewBody,
+            ...(data.author?.name ? { author: data.author.name } : {}),
+            ...(data.reviewRating?.ratingValue ? { rating: data.reviewRating.ratingValue } : {}),
+            sourcedFrom: rec.url,
+          });
+        }
+      }
+      // 2. Z blockquotes z atrybucją
+      for (const q of full.quotes) {
+        if (q.attribution && q.text.length > 30 && q.text.length < 500) {
+          testimonials.push({ text: q.text, author: q.attribution, sourcedFrom: rec.url });
+        }
+      }
+      if (testimonials.length >= limit) break;
+    }
+    return { count: Math.min(testimonials.length, limit), testimonials: testimonials.slice(0, limit) };
+  }
+
+  private async toolGetFaqForTopic(args: Record<string, unknown>): Promise<unknown> {
+    const topic = args['topic'] as string;
+    const limit = (args['limit'] as number) ?? 5;
+    if (!topic) throw new Error('Missing topic argument');
+    const topicLower = topic.toLowerCase();
+    const allQA: Array<{ question: string; answer: string; sourcedFrom: string; score: number }> = [];
+    for (const rec of this.opts.pageIndex.list()) {
+      const full = rec.full ?? (await this.opts.loadFullPage?.(rec.path));
+      if (!full) continue;
+      for (const qa of full.qa) {
+        const qLower = qa.question.toLowerCase();
+        const aLower = qa.answer.toLowerCase();
+        let score = 0;
+        if (qLower.includes(topicLower)) score += 50;
+        if (aLower.includes(topicLower)) score += 20;
+        const topicTokens = topicLower.split(/\s+/).filter((t) => t.length > 2);
+        for (const tok of topicTokens) {
+          if (qLower.includes(tok)) score += 10;
+          if (aLower.includes(tok)) score += 4;
+        }
+        if (score > 0) allQA.push({ question: qa.question, answer: qa.answer, sourcedFrom: rec.url, score });
+      }
+    }
+    allQA.sort((a, b) => b.score - a.score);
+    return { topic, count: Math.min(allQA.length, limit), results: allQA.slice(0, limit) };
   }
 
   private toolListPages(args: Record<string, unknown>): unknown {

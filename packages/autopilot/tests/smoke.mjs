@@ -110,7 +110,8 @@ async function main() {
   assert(typeof ap.run === 'function', 'ap.run exists');
   assert(typeof ap.healthCheck === 'function', 'ap.healthCheck exists');
   assert(typeof ap.report === 'function', 'ap.report exists');
-  assert(Object.keys(ap.modules).length === 15, `15 modules loaded (got ${Object.keys(ap.modules).length})`);
+  assert(Object.keys(ap.modules).length === 16, `16 modules loaded (got ${Object.keys(ap.modules).length})`);
+  assert(typeof ap.modules['outreach-generator'] === 'object', 'outreach-generator module loaded');
 
   // === Test 7: Health check (no network) ===
   console.log('\n[7] Health check');

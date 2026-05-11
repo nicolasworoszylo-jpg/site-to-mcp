@@ -13,3 +13,4 @@ export { IndexNowPushModule } from './indexnow-push.js';
 export { HreflangValidatorModule } from './hreflang-validator.js';
 export { CanonicalValidatorModule } from './canonical-validator.js';
 export { LighthouseAuditModule } from './lighthouse-audit.js';
+export { OutreachGeneratorModule, type OutreachOpts, type OutreachCandidate } from './outreach-generator.js';

@@ -25,6 +25,8 @@ import { createSiteToMcp, type SiteToMcpConfig } from '@vidok/site-to-mcp';
 import { createAutopilot } from '../factory.js';
 import { generateLaunchAgentPlist } from '../scheduler/launchagent.js';
 import { BakeOrchestrator } from '../bake/orchestrator.js';
+import { OnboardingWizard } from '../onboarding/wizard.js';
+import { scoreCitation, extractContent } from '@vidok/site-to-mcp';
 import { Registry, loadRegistry } from '../wisepeople/registry.js';
 import { BulkBakeOrchestrator } from '../wisepeople/bulk-bake.js';
 import { Dashboard } from '../wisepeople/dashboard.js';
@@ -76,6 +78,66 @@ async function main(): Promise<void> {
   if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
     printHelp();
     return;
+  }
+
+  // === ONBOARD command (1-day interactive workflow) — bez configu ===
+  if (cmd === 'onboard') {
+    try {
+      const siteUrl = positional[0];
+      if (!siteUrl) throw new Error('Usage: s2m-autopilot onboard https://klient.pl [--out ./klient]');
+      const outDir = flags['out'] as string | undefined;
+      const ollamaUrl = (flags['ollama'] as string | undefined) ?? 'http://localhost:11434';
+      const wizard = new OnboardingWizard({
+        siteUrl,
+        ...(outDir ? { outDir } : {}),
+        ollamaUrl,
+      });
+      await wizard.run();
+    } catch (err) {
+      console.error(color('red', `✗ ${err instanceof Error ? err.message : String(err)}`));
+      exitCode = 1;
+    }
+    process.exit(exitCode);
+  }
+
+  // === SCORE command (citation worthiness per page) — bez configu ===
+  if (cmd === 'score') {
+    try {
+      const url = positional[0];
+      if (!url) throw new Error('Usage: s2m-autopilot score https://klient.pl/blog/post');
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const html = await res.text();
+      const content = extractContent({ url, html });
+      const score = scoreCitation({
+        content,
+        schemaTypesCount: content.schemaFound.length,
+        hasFaqSchema: content.schemaFound.some((s) => s.type === 'FAQPage'),
+        hasPersonSchema: content.schemaFound.some((s) => s.type === 'Person'),
+        hasSpeakable: content.schemaFound.some((s) => s.type === 'SpeakableSpecification'),
+      });
+      console.log(color('bold', `Citation worthiness: ${url}`));
+      console.log();
+      console.log(`  Overall: ${color('cyan', String(score.overall))}/100  Grade: ${color('cyan', score.grade)}`);
+      console.log();
+      console.log(color('bold', 'Axes:'));
+      for (const [name, axis] of Object.entries(score.axes)) {
+        const bar = '█'.repeat(Math.floor(axis.score / 5)).padEnd(20, '·');
+        console.log(`  ${name.padEnd(22)} ${color('dim', bar)} ${axis.score}  ${color('dim', axis.measured)}`);
+      }
+      console.log();
+      console.log(color('bold', 'Top 5 recommendations:'));
+      for (const r of score.recommendations) {
+        const priorityColor: keyof typeof COLORS = r.priority === 'critical' ? 'red' : r.priority === 'high' ? 'yellow' : 'cyan';
+        console.log(`  [${color(priorityColor, r.priority.toUpperCase())}] ${color('bold', r.action)}`);
+        console.log(`    Example: ${color('dim', r.example)}`);
+        console.log(`    Expected: ${color('dim', r.expectedLift)} (+${r.impact} pts)`);
+      }
+    } catch (err) {
+      console.error(color('red', `✗ ${err instanceof Error ? err.message : String(err)}`));
+      exitCode = 1;
+    }
+    process.exit(exitCode);
   }
 
   // === WP commands (multi-tenant) — działają BEZ autopilot.config.json ===
@@ -444,6 +506,10 @@ function printHelp(): void {
   console.log(`${color('bold', 's2m-autopilot')} ${color('dim', 'v1.0.0')} — Zero-subscription SEO automation
 
 ${color('bold', 'Komendy:')}
+${color('bold', 'Single-client workflow (jeden dzień, jeden klient):')}
+  onboard <url> [--out DIR]           Interactive wizard: audit → setup → bake → score → outreach
+                                      → deploy instructions. CAŁY workflow w jednym command.
+  score <url>                         Citation Worthiness Score 0-100 (7-osiowa ocena) — instant
   bake [--site URL] [--out DIR]       Pre-compute jednej strony na statyczne pliki
        [--max N] [--refresh]
        [--modules alt,rewrite,faq,schema,markdown]

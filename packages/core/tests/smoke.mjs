@@ -177,14 +177,16 @@ async function main() {
     pageIndex,
   });
   const manifest = mcp.manifest();
-  assert(manifest.tools.length === 6, `MCP manifest has 6 tools (got ${manifest.tools.length})`);
+  assert(manifest.tools.length === 12, `MCP manifest has 12 tools (got ${manifest.tools.length})`);
   assert(manifest.tools.some((t) => t.name === 'list_pages'), 'MCP has list_pages tool');
+  assert(manifest.tools.some((t) => t.name === 'get_pricing'), 'MCP has get_pricing tool (v1.2)');
+  assert(manifest.tools.some((t) => t.name === 'get_team'), 'MCP has get_team tool (v1.2)');
 
   const initRes = await mcp.handle({ jsonrpc: '2.0', id: 1, method: 'initialize' });
   assert(initRes.result, 'MCP initialize returns result');
 
   const listRes = await mcp.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  assert(listRes.result?.tools?.length === 6, 'MCP tools/list returns 6 tools');
+  assert(listRes.result?.tools?.length === 12, 'MCP tools/list returns 12 tools');
 
   // === Test 10: content negotiation ===
   console.log('\n[10] Content negotiation');

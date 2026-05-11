@@ -47,4 +47,18 @@ export {
 } from './core/mcp-server/index.js';
 export { Monitor, monitor, type MonitoringOptions, type EngineName } from './core/monitoring/index.js';
 export { computeOverallScore, scoreLetter, type ScoringResult } from './core/scoring/index.js';
+export {
+  BakedContentReader,
+  loadBakedContent,
+  type BakedManifest,
+  type BakedPage,
+} from './core/baked/index.js';
+export {
+  CitationScorer,
+  scoreCitation,
+  type CitationScore,
+  type AxisScore,
+  type Recommendation,
+  type ScoreOptions,
+} from './core/citation-scorer/index.js';
 export { createSiteToMcp, type SiteToMcp } from './factory.js';
