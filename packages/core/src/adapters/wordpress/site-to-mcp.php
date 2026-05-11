@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Site to MCP — SEO for LLM
  * Description: Konwertuje stronę WordPress na in-the-wild cytowane przez ChatGPT/Perplexity/Claude/Gemini źródło. Auto-genuje llms.txt, robots.txt z AI bots split, sitemap z hreflang, schema.org @graph (Organization + Article + FAQPage + Person), .well-known/agent-card.json, MCP-over-HTTP endpoint, plus runtime negotiation (Accept: text/markdown → markdown response).
- * Version: 1.0.0
+ * Version: 1.2.0
  * Author: Vidok Studio
  * Author URI: https://vidok.studio
  * License: MIT
@@ -16,7 +16,7 @@
 
 if (!defined('ABSPATH')) { exit; }
 
-define('S2M_VERSION', '1.0.0');
+define('S2M_VERSION', '1.2.0');
 define('S2M_PLUGIN_DIR', plugin_dir_path(__FILE__));
 
 class SiteToMcp {
@@ -263,8 +263,49 @@ class SiteToMcp {
             ],
         ];
 
-        // Article/BlogPosting dla single posts
-        if (is_single() || is_page()) {
+        // WooCommerce Product schema — auto-detection (v1.2)
+        if (function_exists('is_product') && is_product()) {
+            global $product;
+            if (!$product && function_exists('wc_get_product')) {
+                $product = wc_get_product(get_the_ID());
+            }
+            if ($product) {
+                $product_schema = [
+                    '@type' => 'Product',
+                    'name' => $product->get_name(),
+                    'description' => wp_strip_all_tags($product->get_short_description() ?: $product->get_description()),
+                    'url' => get_permalink($product->get_id()),
+                ];
+                if ($product->get_sku()) $product_schema['sku'] = $product->get_sku();
+                if ($product->get_image_id()) {
+                    $img = wp_get_attachment_image_url($product->get_image_id(), 'large');
+                    if ($img) $product_schema['image'] = $img;
+                }
+                if ($product->get_price() !== '') {
+                    $product_schema['offers'] = [
+                        '@type' => 'Offer',
+                        'price' => $product->get_price(),
+                        'priceCurrency' => get_woocommerce_currency(),
+                        'availability' => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                        'url' => get_permalink($product->get_id()),
+                    ];
+                }
+                if ($product->get_average_rating() > 0 && $product->get_review_count() > 0) {
+                    $product_schema['aggregateRating'] = [
+                        '@type' => 'AggregateRating',
+                        'ratingValue' => $product->get_average_rating(),
+                        'reviewCount' => $product->get_review_count(),
+                    ];
+                }
+                $product_schema['brand'] = [
+                    '@type' => 'Brand',
+                    'name' => $this->config['site_name'],
+                ];
+                $graph[] = $product_schema;
+            }
+        }
+        // Article/BlogPosting dla single posts (jeśli nie product)
+        elseif (is_single() || is_page()) {
             global $post;
             $author = get_userdata($post->post_author);
             $graph[] = [

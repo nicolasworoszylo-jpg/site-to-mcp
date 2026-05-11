@@ -1,7 +1,7 @@
 {
     "name": "@vidok/site-to-mcp",
-    "version": "1.0.0",
-    "description": "Universal SEO-for-LLM plugin. Konwertuje dowoln\u0105 stron\u0119 internetow\u0105 w cytowane przez ChatGPT/Perplexity/Claude/Gemini \u017ar\u00f3d\u0142o. Audit + autofix + schema injection + llms.txt + MCP-over-HTTP endpoint + monitoring.",
+    "version": "1.2.0",
+    "description": "Universal SEO-for-LLM plugin. Konwertuje dowoln\u0105 stron\u0119 internetow\u0105 w cytowane przez ChatGPT/Perplexity/Claude/Gemini \u017ar\u00f3d\u0142o. Audit + autofix + schema injection + llms.txt + MCP-over-HTTP endpoint + monitoring + verify + STDIO bridge.",
     "keywords": [
         "seo",
         "geo",

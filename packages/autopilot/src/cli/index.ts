@@ -24,8 +24,13 @@ import { resolve } from 'node:path';
 import { createSiteToMcp, type SiteToMcpConfig } from '@vidok/site-to-mcp';
 import { createAutopilot } from '../factory.js';
 import { generateLaunchAgentPlist } from '../scheduler/launchagent.js';
+import { createRequire } from 'node:module';
 import { BakeOrchestrator } from '../bake/orchestrator.js';
 import { OnboardingWizard } from '../onboarding/wizard.js';
+
+const require = createRequire(import.meta.url);
+const PKG = require('../../package.json') as { version: string };
+const VERSION = PKG.version;
 import { scoreCitation, extractContent } from '@vidok/site-to-mcp';
 import { Registry, loadRegistry } from '../wisepeople/registry.js';
 import { BulkBakeOrchestrator } from '../wisepeople/bulk-bake.js';
@@ -503,7 +508,7 @@ async function main(): Promise<void> {
 }
 
 function printHelp(): void {
-  console.log(`${color('bold', 's2m-autopilot')} ${color('dim', 'v1.0.0')} — Zero-subscription SEO automation
+  console.log(`${color('bold', 's2m-autopilot')} ${color('dim', `v${VERSION}`)} — Zero-subscription SEO automation
 
 ${color('bold', 'Komendy:')}
 ${color('bold', 'Single-client workflow (jeden dzień, jeden klient):')}

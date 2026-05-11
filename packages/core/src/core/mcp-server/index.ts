@@ -278,7 +278,7 @@ export class MCPServer {
     const mcpPath = this.opts.config.mcp?.path ?? '/.well-known/mcp';
     return {
       name: this.opts.config.brand.name,
-      version: '1.0.0',
+      version: '1.2.0',
       description: this.opts.config.brand.description ?? `MCP server for ${this.opts.config.brand.name}`,
       baseUrl: `${base}${mcpPath}`,
       tools: MCP_TOOLS,
@@ -317,7 +317,7 @@ export class MCPServer {
         return this.ok(req.id, {
           // MCP spec version (data-coded). Aktualna stabilna: 2025-06-18.
           protocolVersion: '2025-06-18',
-          serverInfo: { name: this.opts.config.brand.name, version: '1.0.0' },
+          serverInfo: { name: this.opts.config.brand.name, version: '1.2.0' },
           capabilities: { tools: {}, resources: {} },
         });
       }

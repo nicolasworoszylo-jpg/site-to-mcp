@@ -24,8 +24,13 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { createRequire } from 'node:module';
 import { createSiteToMcp } from '../factory.js';
 import { verifyDeploy } from '../core/verify/index.js';
+
+const require = createRequire(import.meta.url);
+const PKG = require('../../package.json') as { version: string };
+const VERSION = PKG.version;
 import { computeOverallScore } from '../core/scoring/index.js';
 import type { SiteToMcpConfig } from '../types/index.js';
 
@@ -385,7 +390,7 @@ async function cmdMonitor(flags: Record<string, string | boolean>): Promise<numb
 }
 
 function printHelp(): void {
-  console.log(`${color('bold', 'site-to-mcp')} ${color('dim', 'v1.0.0')} — Universal SEO for LLM plugin
+  console.log(`${color('bold', 'site-to-mcp')} ${color('dim', `v${VERSION}`)} — Universal SEO for LLM plugin
 
 ${color('bold', 'Komendy:')}
   init                          Interactive setup → s2m.config.json

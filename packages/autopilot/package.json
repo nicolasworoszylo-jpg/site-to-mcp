@@ -1,7 +1,7 @@
 {
     "name": "@vidok/site-to-mcp-autopilot",
-    "version": "1.0.0",
-    "description": "Zero-subscription SEO automation. 15 modules running fully locally (Ollama + SQLite + free APIs only). No SerpAPI, no Ahrefs, no Profound. Plug into @vidok/site-to-mcp for complete GEO+SEO operating system.",
+    "version": "1.2.0",
+    "description": "Zero-subscription SEO automation. 16 modules + Onboarding Wizard + Bake + Outreach Generator + Multi-tenant Wise People support. Running fully locally (Ollama + SQLite + free APIs only). No SerpAPI, no Ahrefs, no Profound.",
     "type": "module",
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
