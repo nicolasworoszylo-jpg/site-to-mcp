@@ -4,50 +4,77 @@ Wszystkie istotne zmiany w projekcie.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] — 2026-05-11
+## [1.2.0] — 2026-05-11 — Single-client workflow
+
+### Added — Core
+
+- **Citation Worthiness Scorer** (`packages/core/src/core/citation-scorer/`) — 7-osiowa ocena per page 0-100 + A-F grade z konkretnymi recommendations + research citations (Wellows, Indig, SEJ, Rankeo, ALM)
+- **Verify command** (`packages/core/src/core/verify/`) — post-deploy health check 14 sprawdzeń: AI files (5), MCP manifest GET + JSON-RPC POST, AI bots access (3), markdown negotiation, schema injection w `<head>`, ai:tokens meta, robots.txt deep AI bots check
+- **STDIO bridge** (`packages/core/src/core/mcp-server/stdio.ts` + `packages/core/src/cli/stdio.ts`) — newline-delimited JSON-RPC 2.0 over stdin/stdout. Claude Desktop direct integration: `s2m-stdio --baked PATH`
+- **Rich MCP Tools** (6 → 12) — `get_pricing`, `get_team`, `get_case_studies`, `get_contact`, `get_testimonials`, `get_faq_for_topic`
+- CLI: `verify <url>` z exit code 2 dla CI gate
+
+### Added — Autopilot
+
+- **OnboardingWizard** (`packages/autopilot/src/onboarding/wizard.ts`) — interactive 1-day workflow: audit → setup → bake → score → outreach → deploy instructions → ONBOARDING_REPORT.md
+- **OutreachGeneratorModule** (`packages/autopilot/src/modules/outreach-generator.ts`) — SERP scrape + citation gap detection (kto cytuje konkurencję, nie ciebie) + LLM-generated personalized email templates
+- CLI: `onboard <url>` (interactive wizard), `score <url>` (instant 7-axis scoring)
+
+### Added — Documentation
+
+- `JAK-TO-DZIALA.md` — prosty język, dla nieprogramistów + klientów
+- `docs/SINGLE-CLIENT-WORKFLOW.md` — full 6h workflow per klient z cennikiem (Tier A/B/C: 3-8k PLN)
+- Updated `README.md` — v1.2 features + roadmap
+- Updated `STRUKTURA.md` — nowe pliki
+
+### Tests
+
+- Core: 56 asercji (51 + 5 nowe: MCP 12-tools, get_pricing, get_team)
+- Autopilot: 46 asercji (16 modules check)
+- Live verified: `verify` on zaproszeniaonline.com (9 pass / 3 warn / 2 fail), `score` 57/100 C z 5 actionable recs
+
+## [1.1.0] — 2026-05-11 — Bake & Forget
 
 ### Added
 
-#### Core
-- **AuditEngine** — 6-warstwowy auditor (indexability, schema, semantic_html, content, ai_files, performance). Każdy finding ma severity, citation, autofix-ref.
-- **Autofixer** — 12+ fixerów. Iron law: zero destruktywnych zmian. Risk gate z `maxRisk` config.
-- **ContentExtractor** — HTML → markdown przez Turndown. Wyciąga Q&A pairs (z FAQPage schema albo H3-question pattern), stats, quotes, tables, entities. Plus `estimateTokens()` + `chunkText()`.
-- **Schema builder** — 14 typów Schema.org (Organization, WebSite, BreadcrumbList, Article/BlogPosting/NewsArticle, Person, FAQPage, Product, LocalBusiness, HowTo, Service, QAPage, SpeakableSpecification). `@graph` bundling. XSS-safe `<script>` serialization.
-- **AI files generators** — `llms.txt`, `llms-full.txt` (cap 28k tokens), `robots.txt` z 6 AI bots split (search vs training), `sitemap.xml` z hreflang, `feed.xml`, `/.well-known/agent-card.json` (A2A spec), `_headers` z `Content-Signal`, `skill.md` (Osmani layer 3), `AGENTS.md` (ETH Zurich March 2026 — skeleton, human fill only), eksperymentalny `ai.txt`.
-- **MCP server** — MCP-over-HTTP, 6 tools: `list_pages`, `get_page`, `search_pages`, `get_schema`, `get_faq`, `get_brand`. JSON-RPC 2.0. PageIndex z lekkim full-text search.
-- **Content negotiation** — `detectAiBot()` (15 patterns: GPTBot/ChatGPT-User/OAI-SearchBot/ClaudeBot/Claude-SearchBot/Claude-User/PerplexityBot/Google-Extended/AppleBot-Extended/Bytespider/CCBot/YouBot/Meta-ExternalAgent + IDE: axios/curl/got/colly). `shouldServeMarkdown()` (4 sygnały). `htmlToMarkdownResponse()` z `X-AI-Tokens`, `X-AI-Source-URL`, `Vary` headers.
-- **Monitoring** — citation tracker dla ChatGPT (gpt-4o-search-preview), Perplexity (sonar-pro), Claude (sonnet-4-7), Gemini (1.5-pro). Sentiment heuristic. Weekly report w markdown.
-- **Scoring** — A-F grade + category (ready/needs_work/not_ready). Top 10 recommendations by impact.
+- **BakeOrchestrator** + **BakedContentReader** — pre-compute architecture
+- Plugin core nie wymaga Ollamy w runtime
+- CLI: `bake [--refresh]`, `wp bake-all`
+- `docs/BAKING.md` — pełen workflow
 
-#### Adapters
-- **Next.js** — `siteToMcpMiddleware`, route handlers (`createMcpRoute`, `createLlmsTxtRoute`, `createRobotsRoute`, `createSitemapRoute`, `createAgentCardRoute`), `next.config.mjs` wrapper (`withSiteToMcp`).
-- **Express** — `siteToMcpRouter()`, mountable na każdej ścieżce.
-- **Astro** — integration z `astro:build:done` hook. Opcjonalne `.md` companions per page.
-- **WordPress** — self-contained PHP plugin. Zero JS deps. Admin UI dla AI bots policy. Custom rewrite rules dla /llms.txt, /skill.md, /.well-known/*.
-- **Vanilla** — `createWorkerHandler` (Cloudflare/Vercel Edge), `BROWSER_SCRIPT` (CDN tag z Copy for AI button + meta injection).
+### Added — Wise People multi-tenant
 
-#### CLI
-- `site-to-mcp init` — interactive setup → s2m.config.json
-- `site-to-mcp audit <url> [--threshold N] [--json]` — CI-friendly z exit code 2
-- `site-to-mcp fix <url> [--apply]`
-- `site-to-mcp generate llms.txt|robots.txt|sitemap.xml|agent-card.json|skill.md|AGENTS.md|_headers [--out path]`
-- `site-to-mcp serve [--port 3030]` — local dev server
-- `site-to-mcp monitor [--out report.md]`
+- 9 industry presets
+- Registry (clients.json), bulk-bake (concurrent + resumable), dashboard (HTML/MD/JSON), deploy helpers (rsync/git/sftp/manual)
+- 8 nowych komend `wp init/industries/add-client/list/remove-client/bake-all/status/dashboard/deploy-all`
+- `docs/WISE-PEOPLE.md` — agency workflow
 
-#### Docs
-- `README.md` — overview + filozofia + quick start (Next.js)
-- `docs/INSTALLATION.md` — per-framework guide (Next.js, Express, Astro, WordPress, Workers, Vanilla)
-- `docs/ARCHITECTURE.md` — module breakdown + data flow + ADRs
-- `docs/API.md` — pełna referencja
-- `examples/nextjs-demo/` — zaproszeniaonline.com config + middleware + routes
+## [1.0.0] — 2026-05-10 — Initial Release
 
-#### Templates
-- 6 schema templates JSON (Tier 1/2/3): Organization, WebSite, Article, FAQPage, BreadcrumbList, QAPage
+### Added — Core
 
-### Methodology base
+- 6-warstwowy auditor (indexability, schema, semantic_html, content, ai_files, performance)
+- 14 schema templates (Tier 1-3)
+- AI files generators: llms.txt, llms-full.txt, robots, sitemap, RSS, agent-card, skill.md, AGENTS.md, _headers, ai.txt
+- MCP-over-HTTP server (6 tools, JSON-RPC 2.0, auth + rate limit)
+- Runtime content negotiation (15 AI bot UA patterns)
+- Citation monitor (ChatGPT/Perplexity/Claude/Gemini)
+- Autofix (12+ fixers, iron law: zero destruktywnych zmian)
+- 5 adapterów: Next.js, Express, Astro, vanilla/Workers, WordPress
 
-Plugin built on:
-- 16 zwalidowanych tez z `memory/seo_llm_geo_aeo.md` (kwiecień 2026, 3+ źródła per teza)
-- 10 plików operacyjnej metodologii w `~/Desktop/Claude/SEO-LLM-2026/`
-- Research May 2026 (web-analizator): Addy Osmani "Agentic Engine Optimization" framework (Google Cloud AI), Conductor State of AEO/GEO 2026 (17M responses, 100M citations), Indig 30M citation study, NeurIPS 2025 C-SEO Bench, ETH Zurich AGENTS.md value review (March 2026)
-- Adopted patterns from: `aeo.js` (multivmlabs), `agentic-seo` (Osmani), `next-geo` (Continue.dev), `agentmarkup`
+### Added — Autopilot v1.0
+
+- 15 modułów (keyword-research, rank-tracker, alt-generator, content-rewriter, internal-linking, broken-links, backlink-monitor, competitor-tracker, content-refresh, gsc-sync, psi-monitor, indexnow-push, hreflang-validator, canonical-validator, lighthouse-audit)
+- SQLite storage
+- Scheduler (cron + LaunchAgent)
+- Markdown report aggregator
+- CLI z 12 komendami
+
+### Security hardening
+
+- SSRF guard (DNS lookup + private IP block)
+- XSS-safe schema serialization
+- RSS CDATA injection guard
+- WordPress: esc_url/esc_attr/esc_html
+- MCP rate limit + Bearer auth
+- DoS guard w regex (50k iter cap)

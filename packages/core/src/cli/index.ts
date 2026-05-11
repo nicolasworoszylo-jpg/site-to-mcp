@@ -25,6 +25,7 @@ import { existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { createSiteToMcp } from '../factory.js';
+import { verifyDeploy } from '../core/verify/index.js';
 import { computeOverallScore } from '../core/scoring/index.js';
 import type { SiteToMcpConfig } from '../types/index.js';
 
@@ -390,6 +391,7 @@ ${color('bold', 'Komendy:')}
   init                          Interactive setup → s2m.config.json
   audit <url> [--threshold N]   Audit strony, A-F score, exit 2 if < threshold
   fix <url> [--apply]           Propose lub apply autofix (default: propose)
+  verify <url>                  Post-deploy health check (12+ checks: AI files, MCP, AI bots access)
   generate <file> [--out path]  llms.txt | llms-full.txt | robots.txt | sitemap.xml | agent-card.json | skill.md | AGENTS.md | _headers | ai.txt
   serve [--port 3030]           Local dev server z wszystkimi endpoints
   monitor [--out report.md]     Run citation monitoring (wymaga config.monitoring)
@@ -448,6 +450,29 @@ async function main(): Promise<void> {
       case 'monitor':
         exitCode = await cmdMonitor(flags);
         break;
+      case 'verify': {
+        const url = positional[0];
+        if (!url) throw new Error('Usage: site-to-mcp verify https://klient.pl');
+        const report = await verifyDeploy(url);
+        if (flags['json']) {
+          console.log(JSON.stringify(report, null, 2));
+        } else {
+          const ico = report.overall === 'pass' ? color('green', '✓') : report.overall === 'partial' ? color('yellow', '⚠') : color('red', '✗');
+          console.log(`${ico} ${color('bold', `Verify deploy: ${report.url}`)}`);
+          console.log(`  ${color('green', `${report.passed} pass`)} · ${color('yellow', `${report.warnings} warn`)} · ${color('red', `${report.failed} fail`)}`);
+          console.log();
+          for (const c of report.checks) {
+            const i = c.status === 'pass' ? color('green', '✓') : c.status === 'warn' ? color('yellow', '⚠') : color('red', '✗');
+            console.log(`  ${i} ${c.name.padEnd(40)} ${color('dim', c.detail)}`);
+          }
+          if (report.recommendations.length > 0) {
+            console.log('\n' + color('bold', 'Recommendations:'));
+            for (const r of report.recommendations) console.log(`  ${r}`);
+          }
+        }
+        exitCode = report.overall === 'fail' ? 2 : 0;
+        break;
+      }
       case 'help':
       case '--help':
       case '-h':

@@ -61,4 +61,10 @@ export {
   type Recommendation,
   type ScoreOptions,
 } from './core/citation-scorer/index.js';
+export {
+  Verifier,
+  verifyDeploy,
+  type VerifyResult,
+  type VerifyCheck,
+} from './core/verify/index.js';
 export { createSiteToMcp, type SiteToMcp } from './factory.js';
