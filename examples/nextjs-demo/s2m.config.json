@@ -1,0 +1,62 @@
+{
+    "siteUrl": "https://zaproszeniaonline.com",
+    "brand": {
+        "name": "ZaproszeniaOnline",
+        "legalName": "Vidok Studio Nicolas Woroszylo",
+        "description": "Cyfrowe zaproszenia \u015blubne \u2014 bezpapierowe, eleganckie, gotowe w 24h.",
+        "logo": "https://zaproszeniaonline.com/logo.svg",
+        "sameAs": [
+            "https://www.linkedin.com/company/vidok-studio",
+            "https://www.instagram.com/zaproszenia.online"
+        ],
+        "contact": {
+            "email": "kontakt@zaproszeniaonline.com",
+            "phone": "+48 510 510 510"
+        },
+        "primaryAuthor": {
+            "name": "Nicolas Woroszylo",
+            "jobTitle": "Founder & Designer",
+            "url": "/o-nas",
+            "sameAs": [
+                "https://www.linkedin.com/in/nicolas-woroszylo",
+                "https://github.com/nicolasworoszylo-jpg"
+            ],
+            "credentials": [
+                "10 lat do\u015bwiadczenia w projektowaniu UX/UI",
+                "100+ zrealizowanych projekt\u00f3w wesel"
+            ]
+        }
+    },
+    "aiBots": {
+        "GPTBot": false,
+        "ClaudeBot": false,
+        "PerplexityBot": true,
+        "Google-Extended": false,
+        "AppleBot": true,
+        "Bingbot": true,
+        "CCBot": false,
+        "YouBot": true,
+        "Bytespider": false
+    },
+    "mcp": {
+        "enabled": true,
+        "path": "/.well-known/mcp.json",
+        "rateLimitPerMin": 60,
+        "requireAuth": false
+    },
+    "llmsTxt": {
+        "enabled": true,
+        "path": "/llms.txt",
+        "fullPath": "/llms-full.txt"
+    },
+    "autofix": {
+        "mutate": false,
+        "allowed": [
+            "inject_meta",
+            "inject_schema",
+            "add_attribute",
+            "generate_file"
+        ],
+        "maxRisk": "low"
+    }
+}

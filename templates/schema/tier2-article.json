@@ -1,0 +1,54 @@
+{
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "Jak pisa\u0107 tre\u015bci cytowane przez ChatGPT i Perplexity",
+    "description": "Praktyczny guide oparty o 30M citation study Indig'a i NeurIPS 2025 C-SEO Bench.",
+    "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://example.com/blog/jak-pisac"
+    },
+    "image": [
+        "https://example.com/blog/jak-pisac-cover.jpg"
+    ],
+    "datePublished": "2026-04-30",
+    "dateModified": "2026-05-08",
+    "inLanguage": "pl-PL",
+    "wordCount": 1450,
+    "keywords": "GEO, AEO, SEO dla LLM, citations, ChatGPT, Perplexity",
+    "author": {
+        "@type": "Person",
+        "name": "Jane Doe",
+        "url": "https://example.com/zespol/jane-doe",
+        "jobTitle": "CTO",
+        "sameAs": [
+            "https://linkedin.com/in/janedoe",
+            "https://github.com/janedoe"
+        ],
+        "hasCredential": [
+            {
+                "@type": "EducationalOccupationalCredential",
+                "name": "MIT MEng"
+            },
+            {
+                "@type": "EducationalOccupationalCredential",
+                "name": "10 years widget engineering"
+            }
+        ]
+    },
+    "publisher": {
+        "@type": "Organization",
+        "name": "Example Inc",
+        "logo": {
+            "@type": "ImageObject",
+            "url": "https://example.com/logo.svg"
+        }
+    },
+    "speakable": {
+        "@type": "SpeakableSpecification",
+        "cssSelector": [
+            "h1",
+            "article > p:first-of-type",
+            "[data-speakable]"
+        ]
+    }
+}

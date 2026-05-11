@@ -1,0 +1,30 @@
+{
+    "@context": "https://schema.org",
+    "@type": "QAPage",
+    "mainEntity": {
+        "@type": "Question",
+        "name": "Co jest skuteczniejsze dla AI citations: schema markup czy brand mentions?",
+        "url": "https://example.com/qa/schema-vs-brand-mentions",
+        "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Brand mentions maj\u0105 3x silniejsz\u0105 korelacj\u0119 z AI citations ni\u017c backlinks (Ahrefs, 75 000 brands). Schema markup jest natomiast krytyczne dla parsowania struktury tre\u015bci \u2014 pages z JSON-LD s\u0105 3.2x cz\u0119\u015bciej cytowane w AI Overviews. Najlepiej oba: schema dla struktury + brand mentions dla autorytetu. Dane: AirOps 2026 (corr brand mentions \u2192 AI citation: 0.664 vs backlinks: 0.218).",
+            "author": {
+                "@type": "Person",
+                "name": "Jane Doe",
+                "url": "https://example.com/zespol/jane-doe"
+            },
+            "dateCreated": "2026-05-01"
+        },
+        "suggestedAnswer": [
+            {
+                "@type": "Answer",
+                "text": "Zale\u017cy od silnika. Dla ChatGPT \u2014 schema + Wikipedia authority. Dla Perplexity \u2014 UGC (Reddit/YouTube) + freshness. Conductor 2026: tylko 11% domain overlap mi\u0119dzy engine'ami, wi\u0119c strategie musz\u0105 by\u0107 r\u00f3\u017cne.",
+                "author": {
+                    "@type": "Person",
+                    "name": "Mark Smith"
+                },
+                "upvoteCount": 12
+            }
+        ]
+    }
+}

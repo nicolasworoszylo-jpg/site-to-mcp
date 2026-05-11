@@ -1,0 +1,15 @@
+{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Example Inc",
+    "url": "https://example.com",
+    "inLanguage": "pl-PL",
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://example.com/search?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+    }
+}

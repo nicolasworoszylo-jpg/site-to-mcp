@@ -1,0 +1,30 @@
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "Czy plugin Site to MCP obs\u0142uguje WordPress?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Tak. Plugin ma natywny WordPress adapter w PHP (site-to-mcp.php). Dzia\u0142a bez Node.js \u2014 wszystkie generatory llms.txt, robots.txt, schema, MCP s\u0105 zaimplementowane w PHP. Po aktywacji + flush rewrite rules masz endpointy /llms.txt, /skill.md, /.well-known/mcp.json gotowe."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Czy llms.txt zwi\u0119ksza pozycj\u0119 w Google?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Nie. John Mueller z Google publicznie potwierdzi\u0142 w kwietniu 2026 \u017ce Google Search nie u\u017cywa llms.txt do rankingu. Badanie 300 000 domen (SE Ranking) nie wykry\u0142o wp\u0142ywu llms.txt na AI citations. llms.txt to feature dla AI agent\u00f3w (Cursor, Claude Code, Cline) \u2014 nie SEO play."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Co to znaczy 'runtime negotiation'?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Gdy AI bot (GPTBot, ClaudeBot, PerplexityBot) lub klient z Accept: text/markdown wysy\u0142a request na twoj\u0105 stron\u0119, plugin automatycznie zwraca czyste markdown zamiast HTML \u2014 z headerem X-AI-Tokens informuj\u0105cym o liczbie token\u00f3w. Redukuje to zu\u017cycie token\u00f3w po stronie agenta o ~80%."
+            }
+        }
+    ]
+}

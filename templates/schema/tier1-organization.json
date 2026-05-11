@@ -1,0 +1,31 @@
+{
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Example Inc",
+    "legalName": "Example Sp. z o.o.",
+    "url": "https://example.com",
+    "description": "Wiod\u0105cy dostawca widget\u00f3w w Europie \u015arodkowej.",
+    "logo": {
+        "@type": "ImageObject",
+        "url": "https://example.com/logo.svg"
+    },
+    "sameAs": [
+        "https://linkedin.com/company/example",
+        "https://github.com/example",
+        "https://twitter.com/example",
+        "https://www.wikidata.org/wiki/Q12345"
+    ],
+    "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer service",
+        "email": "hello@example.com",
+        "telephone": "+48-12-345-67-89"
+    },
+    "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "ul. Przyk\u0142adowa 1",
+        "addressLocality": "Warszawa",
+        "postalCode": "00-001",
+        "addressCountry": "PL"
+    }
+}
