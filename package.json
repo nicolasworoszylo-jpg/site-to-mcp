@@ -1,128 +1,26 @@
 {
-    "name": "@vidok/site-to-mcp",
+    "name": "site-to-mcp-monorepo",
     "version": "1.0.0",
-    "description": "Universal SEO-for-LLM plugin. Konwertuje dowoln\u0105 stron\u0119 internetow\u0105 w cytowane przez ChatGPT/Perplexity/Claude/Gemini \u017ar\u00f3d\u0142o. Audit + autofix + schema injection + llms.txt + MCP-over-HTTP endpoint + monitoring.",
-    "keywords": [
-        "seo",
-        "geo",
-        "aeo",
-        "llm",
-        "ai-search",
-        "chatgpt",
-        "perplexity",
-        "claude",
-        "gemini",
-        "schema",
-        "schema-org",
-        "structured-data",
-        "llms-txt",
-        "mcp",
-        "model-context-protocol",
-        "ai-citations",
-        "answer-engine-optimization",
-        "generative-engine-optimization"
-    ],
-    "type": "module",
-    "main": "./dist/index.js",
-    "module": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
-        },
-        "./next": {
-            "types": "./dist/adapters/nextjs/index.d.ts",
-            "import": "./dist/adapters/nextjs/index.js"
-        },
-        "./express": {
-            "types": "./dist/adapters/express/index.d.ts",
-            "import": "./dist/adapters/express/index.js"
-        },
-        "./astro": {
-            "types": "./dist/adapters/astro/index.d.ts",
-            "import": "./dist/adapters/astro/index.js"
-        },
-        "./vanilla": {
-            "types": "./dist/adapters/vanilla/index.d.ts",
-            "import": "./dist/adapters/vanilla/index.js"
-        },
-        "./audit": {
-            "types": "./dist/core/audit/index.d.ts",
-            "import": "./dist/core/audit/index.js"
-        },
-        "./autofix": {
-            "types": "./dist/core/autofix/index.d.ts",
-            "import": "./dist/core/autofix/index.js"
-        },
-        "./schema": {
-            "types": "./dist/core/schema/index.d.ts",
-            "import": "./dist/core/schema/index.js"
-        },
-        "./mcp": {
-            "types": "./dist/core/mcp-server/index.d.ts",
-            "import": "./dist/core/mcp-server/index.js"
-        }
-    },
-    "bin": {
-        "site-to-mcp": "./dist/cli/index.js",
-        "s2m": "./dist/cli/index.js"
-    },
-    "files": [
-        "dist",
-        "templates",
-        "README.md",
-        "INSTALLATION.md",
-        "ARCHITECTURE.md",
-        "CHANGELOG.md",
-        "LICENSE"
+    "private": true,
+    "description": "Site-to-MCP monorepo: core SEO-for-LLM plugin + Autopilot (zero-subscription SEO automation).",
+    "workspaces": [
+        "packages/*"
     ],
     "scripts": {
-        "build": "tsc -p tsconfig.json && cp -R templates dist/",
-        "dev": "tsc --watch -p tsconfig.json",
-        "test": "npm run build && node tests/smoke.mjs",
-        "test:smoke": "node tests/smoke.mjs",
-        "lint": "tsc --noEmit",
-        "prepublishOnly": "npm run build && npm run test:smoke"
-    },
-    "dependencies": {
-        "cheerio": "^1.0.0",
-        "node-html-parser": "^6.1.13",
-        "turndown": "^7.2.0",
-        "fast-xml-parser": "^4.5.0",
-        "zod": "^3.23.8"
-    },
-    "peerDependencies": {
-        "next": ">=13.0.0",
-        "express": "^4.0.0 || ^5.0.0",
-        "astro": "^4.0.0 || ^5.0.0"
-    },
-    "peerDependenciesMeta": {
-        "next": {
-            "optional": true
-        },
-        "express": {
-            "optional": true
-        },
-        "astro": {
-            "optional": true
-        }
-    },
-    "devDependencies": {
-        "@types/node": "^20.0.0",
-        "@types/turndown": "^5.0.5",
-        "@types/express": "^4.17.21",
-        "typescript": "^5.5.0"
+        "build": "npm run build -w @vidok/site-to-mcp && npm run build -w @vidok/site-to-mcp-autopilot",
+        "test": "npm run test -w @vidok/site-to-mcp && npm run test -w @vidok/site-to-mcp-autopilot",
+        "test:core": "npm run test -w @vidok/site-to-mcp",
+        "test:autopilot": "npm run test -w @vidok/site-to-mcp-autopilot",
+        "lint": "npm run lint --workspaces --if-present",
+        "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules package-lock.json"
     },
     "engines": {
         "node": ">=18.0.0"
     },
     "license": "MIT",
+    "author": "Vidok Studio <nicolas@vidok.studio>",
     "repository": {
         "type": "git",
-        "url": "https://github.com/vidokstudio/site-to-mcp"
-    },
-    "author": "Vidok Studio <nicolas@vidok.studio>",
-    "homepage": "https://github.com/vidokstudio/site-to-mcp#readme",
-    "bugs": "https://github.com/vidokstudio/site-to-mcp/issues"
+        "url": "https://github.com/nicolasworoszylo-jpg/site-to-mcp"
+    }
 }

@@ -1,0 +1,47 @@
+{
+    "name": "@vidok/site-to-mcp-autopilot",
+    "version": "1.0.0",
+    "description": "Zero-subscription SEO automation. 15 modules running fully locally (Ollama + SQLite + free APIs only). No SerpAPI, no Ahrefs, no Profound. Plug into @vidok/site-to-mcp for complete GEO+SEO operating system.",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./modules": {
+            "types": "./dist/modules/index.d.ts",
+            "import": "./dist/modules/index.js"
+        }
+    },
+    "bin": {
+        "s2m-autopilot": "./dist/cli/index.js"
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "lint": "tsc --noEmit",
+        "test": "npm run build && node tests/smoke.mjs",
+        "test:smoke": "node tests/smoke.mjs"
+    },
+    "dependencies": {
+        "@vidok/site-to-mcp": "^1.0.0",
+        "cheerio": "^1.0.0",
+        "better-sqlite3": "^11.3.0",
+        "node-cron": "^3.0.3"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/better-sqlite3": "^7.6.11",
+        "@types/node-cron": "^3.0.11",
+        "typescript": "^5.5.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "license": "MIT"
+}

@@ -59,3 +59,18 @@ ehthumbs.db
 
 # Local config
 s2m.config.local.json
+
+# Monorepo specific
+packages/*/dist/
+packages/*/node_modules/
+packages/*/coverage/
+packages/*/tsconfig.tsbuildinfo
+
+# Autopilot runtime data
+autopilot.db
+autopilot.db-journal
+autopilot.db-wal
+autopilot.db-shm
+autopilot.config.local.json
+autopilot.stdout.log
+autopilot.stderr.log
