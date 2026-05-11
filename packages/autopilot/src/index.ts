@@ -11,3 +11,4 @@ export { generateLaunchAgentPlist } from './scheduler/launchagent.js';
 export { generateWeeklyReport } from './reports/markdown.js';
 export * from './modules/index.js';
 export { BakeOrchestrator, bake, type BakeOptions, type BakedPage as BakedPageRaw, type BakeManifest as BakeManifestRaw } from './bake/orchestrator.js';
+export * from './wisepeople/index.js';

@@ -25,6 +25,12 @@ import { createSiteToMcp, type SiteToMcpConfig } from '@vidok/site-to-mcp';
 import { createAutopilot } from '../factory.js';
 import { generateLaunchAgentPlist } from '../scheduler/launchagent.js';
 import { BakeOrchestrator } from '../bake/orchestrator.js';
+import { Registry, loadRegistry } from '../wisepeople/registry.js';
+import { BulkBakeOrchestrator } from '../wisepeople/bulk-bake.js';
+import { Dashboard } from '../wisepeople/dashboard.js';
+import { Deployer } from '../wisepeople/deploy.js';
+import { listIndustries, getIndustryPreset } from '../wisepeople/templates.js';
+import type { Industry } from '../wisepeople/types.js';
 import type { AutopilotConfig } from '../types.js';
 
 const COLORS = {
@@ -70,6 +76,195 @@ async function main(): Promise<void> {
   if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
     printHelp();
     return;
+  }
+
+  // === WP commands (multi-tenant) — działają BEZ autopilot.config.json ===
+  if (cmd === 'wp') {
+    try {
+      const subcmd = positional[0];
+      const registryPath = (flags['registry'] as string) ?? 'wisepeople.clients.json';
+      const registry = new Registry(resolve(registryPath));
+
+      switch (subcmd) {
+        case 'init': {
+          const agencyName = (flags['agency'] as string) ?? 'Wise People';
+          const agencySlug = (flags['slug'] as string) ?? 'wise-people';
+          const portfolioDir = (flags['portfolio'] as string) ?? './wisepeople-portfolio';
+          registry.init({ name: agencyName, slug: agencySlug }, portfolioDir);
+          console.log(color('green', `✓ Created registry at ${registryPath}`));
+          console.log(color('dim', `  Agency: ${agencyName} (${agencySlug})`));
+          console.log(color('dim', `  Portfolio dir: ${portfolioDir}`));
+          console.log();
+          console.log('Next:');
+          console.log(color('cyan', `  s2m-autopilot wp add-client --slug klient1 --name "Klient 1" --url https://klient1.pl --industry b2c-local`));
+          break;
+        }
+        case 'industries': {
+          console.log(color('bold', 'Available industries:'));
+          for (const ind of listIndustries()) {
+            const preset = getIndustryPreset(ind);
+            console.log(`  ${color('cyan', ind.padEnd(18))} ${preset.description}`);
+          }
+          break;
+        }
+        case 'add-client': {
+          const slug = flags['slug'] as string;
+          const name = flags['name'] as string;
+          const url = flags['url'] as string;
+          const industry = (flags['industry'] as string) as Industry;
+          if (!slug || !name || !url || !industry) {
+            throw new Error('Usage: wp add-client --slug X --name "Y" --url https://Y.pl --industry b2c-local');
+          }
+          const keywordsStr = flags['keywords'] as string | undefined;
+          const targetKeywords = keywordsStr ? keywordsStr.split(',').map((k) => k.trim()) : [];
+          registry.addClient({
+            slug,
+            name,
+            siteUrl: url,
+            industry,
+            brand: { name },
+            targetKeywords,
+            ...(flags['competitors'] ? { competitors: (flags['competitors'] as string).split(',').map((c) => c.trim()) } : {}),
+            ...(flags['deploy-method']
+              ? {
+                  deploy: {
+                    method: flags['deploy-method'] as 'rsync' | 'git' | 'sftp' | 'manual',
+                    ...(flags['deploy-target'] ? { target: flags['deploy-target'] as string } : {}),
+                  },
+                }
+              : {}),
+            tags: flags['tags'] ? (flags['tags'] as string).split(',').map((t) => t.trim()) : ['wise-people'],
+          });
+          console.log(color('green', `✓ Added client: ${slug} (${name})`));
+          break;
+        }
+        case 'list': {
+          const reg = registry.load();
+          const industryFilter = flags['industry'] as Industry | undefined;
+          const list = registry.listClients({ ...(industryFilter ? { industry: industryFilter } : {}) });
+          console.log(color('bold', `${reg.agency.name} — ${list.length} clients`));
+          console.log();
+          for (const c of list) {
+            const status = c.active === false ? color('dim', '⊘ inactive') : color('green', '✓ active');
+            console.log(`  ${color('cyan', c.slug.padEnd(20))} ${c.name.padEnd(30)} ${c.industry.padEnd(18)} ${status}`);
+            console.log(`    ${color('dim', c.siteUrl)}`);
+          }
+          break;
+        }
+        case 'remove-client': {
+          const slug = flags['slug'] as string;
+          if (!slug) throw new Error('Usage: wp remove-client --slug X');
+          registry.removeClient(slug);
+          console.log(color('green', `✓ Removed client: ${slug}`));
+          break;
+        }
+        case 'bake-all': {
+          const ollamaUrl = (flags['ollama'] as string) ?? 'http://localhost:11434';
+          const concurrency = Number(flags['concurrency'] ?? 3);
+          const refresh = flags['refresh'] === true || flags['refresh'] === 'true';
+          const resume = flags['resume'] === true || flags['resume'] === 'true';
+          const industryFilter = flags['industry'] as string | undefined;
+          const tagFilter = flags['tag'] as string | undefined;
+          const slugsCsv = flags['clients'] as string | undefined;
+
+          const baseAutopilotConfig: AutopilotConfig = {
+            // dummy s2m — bulk-bake create per-client
+            s2m: createSiteToMcp({ siteUrl: registry.load().agency.slug, brand: { name: registry.load().agency.name } }),
+            ollamaUrl,
+            log: (m) => console.log(color('dim', m)),
+          };
+
+          const bulk = new BulkBakeOrchestrator(registry, baseAutopilotConfig);
+          console.log(color('bold', `▸ Bulk bake — concurrency: ${concurrency}${refresh ? ', refresh mode' : ''}`));
+
+          const result = await bulk.bake({
+            concurrency,
+            refresh,
+            resume,
+            ...(industryFilter ? { industry: industryFilter } : {}),
+            ...(tagFilter ? { tag: tagFilter } : {}),
+            ...(slugsCsv ? { clientSlugs: slugsCsv.split(',').map((s) => s.trim()) } : {}),
+          });
+
+          console.log();
+          console.log(color('bold', '═══════════════════════════════════════════'));
+          console.log(`  ${color('green', `✓ Succeeded: ${result.succeeded}`)}`);
+          console.log(`  ${color('red', `✗ Failed: ${result.failed}`)}`);
+          console.log(`  ⏳ Skipped: ${result.skipped}`);
+          console.log(`  Total pages baked: ${result.totalPagesBaked}`);
+          console.log(`  Total alt-texts: ${result.totalImagesGenerated}`);
+          console.log(`  Total time: ${Math.round(result.totalDurationMs / 1000 / 60)} min`);
+          console.log(`  State file: ${result.stateFile}`);
+          break;
+        }
+        case 'status': {
+          const baseAutopilotConfig: AutopilotConfig = {
+            s2m: createSiteToMcp({ siteUrl: registry.load().agency.slug, brand: { name: registry.load().agency.name } }),
+          };
+          const bulk = new BulkBakeOrchestrator(registry, baseAutopilotConfig);
+          const state = bulk.status();
+          if (!state) {
+            console.log(color('dim', 'No previous bake state found'));
+            break;
+          }
+          const reg = registry.load();
+          console.log(color('bold', `${reg.agency.name} — bake state`));
+          console.log(color('dim', `Started: ${state.startedAt}`));
+          console.log();
+          for (const job of Object.values(state.jobs)) {
+            const icon = job.state === 'done' ? color('green', '✓') : job.state === 'failed' ? color('red', '✗') : job.state === 'running' ? color('cyan', '▶') : '⏳';
+            const dur = job.durationMs ? color('dim', ` ${Math.round(job.durationMs / 1000)}s`) : '';
+            const pages = job.pagesBaked ? color('dim', ` ${job.pagesBaked}p`) : '';
+            console.log(`  ${icon} ${job.clientSlug.padEnd(20)} ${job.state.padEnd(10)}${dur}${pages}`);
+          }
+          break;
+        }
+        case 'dashboard': {
+          const dashboard = new Dashboard(registry);
+          const format = (flags['format'] as string) ?? 'markdown';
+          const out = flags['out'] as string | undefined;
+
+          let content: string;
+          if (format === 'html') content = dashboard.html();
+          else if (format === 'json') content = JSON.stringify(dashboard.summary(), null, 2);
+          else content = dashboard.markdown();
+
+          if (out) {
+            const { writeFileSync: w, mkdirSync: m } = await import('node:fs');
+            const { dirname: d } = await import('node:path');
+            m(d(resolve(out)), { recursive: true });
+            w(resolve(out), content);
+            console.log(color('green', `✓ Wrote ${out}`));
+          } else {
+            console.log(content);
+          }
+          break;
+        }
+        case 'deploy-all': {
+          const deployer = new Deployer(registry);
+          const dryRun = flags['dry-run'] === true || flags['dry-run'] === 'true';
+          const slugsCsv = flags['clients'] as string | undefined;
+          console.log(color('bold', `▸ Bulk deploy${dryRun ? ' (dry-run)' : ''}`));
+          const result = await deployer.deployAll({
+            dryRun,
+            ...(slugsCsv ? { clientSlugs: slugsCsv.split(',').map((s) => s.trim()) } : {}),
+          });
+          console.log();
+          console.log(`  ${color('green', `✓ Succeeded: ${result.succeeded}`)}`);
+          console.log(`  ${color('red', `✗ Failed: ${result.failed}`)}`);
+          console.log(`  ⓘ Manual: ${result.manual}`);
+          break;
+        }
+        default:
+          console.error(color('red', `Unknown wp subcommand: ${subcmd}`));
+          console.log(`  Available: init, industries, add-client, list, remove-client, bake-all, status, dashboard, deploy-all`);
+          exitCode = 1;
+      }
+    } catch (err) {
+      console.error(color('red', `✗ ${err instanceof Error ? err.message : String(err)}`));
+      exitCode = 1;
+    }
+    process.exit(exitCode);
   }
 
   try {
@@ -249,10 +444,31 @@ function printHelp(): void {
   console.log(`${color('bold', 's2m-autopilot')} ${color('dim', 'v1.0.0')} — Zero-subscription SEO automation
 
 ${color('bold', 'Komendy:')}
-  bake [--site URL] [--out DIR]       Pre-compute WSZYSTKO na statyczne pliki (Ollama wymagana)
-                                      Po bake strona "żyje własnym życiem" bez LLM
+  bake [--site URL] [--out DIR]       Pre-compute jednej strony na statyczne pliki
        [--max N] [--refresh]
        [--modules alt,rewrite,faq,schema,markdown]
+
+${color('bold', 'Multi-tenant (Wise People / agency 100+ klientów):')}
+  wp init [--agency X --slug Y]       Stwórz wisepeople.clients.json registry
+  wp industries                       Lista 9 industry presets
+  wp add-client --slug X --name "Y"   Dodaj klienta do registry
+                --url URL --industry I
+                [--keywords k,k,k] [--competitors c,c]
+                [--deploy-method rsync|git|sftp|manual]
+                [--deploy-target target] [--tags t,t]
+  wp list [--industry I]              Lista wszystkich klientów
+  wp remove-client --slug X
+  wp bake-all [--concurrency N=3]     Bulk bake 100+ klientów paralelnie
+              [--refresh] [--resume]  resumable + skip-already-done
+              [--clients csv]
+              [--industry I] [--tag T]
+  wp status                           Pokaż stan ostatniego bulk bake
+  wp dashboard [--format md|html|json] Aggregate raport (markdown/HTML/JSON)
+               [--out PATH]
+  wp deploy-all [--dry-run]           Bulk deploy do wszystkich klientów
+                [--clients csv]
+
+${color('bold', 'Single-tenant:')}
   health                              Status Ollama + free APIs
   run <module> [--opts json]          Uruchom dowolny moduł
   keyword-research <seed> [--max N]   Google Autosuggest scrape
