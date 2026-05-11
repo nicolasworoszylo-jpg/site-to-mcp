@@ -6,8 +6,25 @@
 
 | Pakiet | Co robi | Status |
 |---|---|---|
-| [`@vidok/site-to-mcp`](packages/core) | Plugin do stron WWW — generuje llms.txt, robots.txt, schema, MCP-over-HTTP endpoint. AI bot detection + runtime markdown negotiation. 5 framework adapterów (Next.js, Express, Astro, vanilla, WordPress). | v1.0.0 ✓ |
-| [`@vidok/site-to-mcp-autopilot`](packages/autopilot) | 15-modułowa automatyzacja SEO. Keyword research, rank tracking, alt generator (Ollama), content rewriter, internal linking, broken links, backlinks (Common Crawl), GSC sync, PSI monitor, IndexNow, Lighthouse. **Zero zewnętrznych subskrypcji**. | v1.0.0 ✓ |
+| [`@vidok/site-to-mcp`](packages/core) | Plugin do stron WWW — generuje llms.txt, robots.txt, schema, MCP-over-HTTP endpoint. AI bot detection + runtime markdown negotiation. **Czyta pre-computed bake** (zero LLM runtime). 5 framework adapterów. | v1.1.0 ✓ |
+| [`@vidok/site-to-mcp-autopilot`](packages/autopilot) | 15-modułowa automatyzacja SEO + **`bake` command** (one-shot pre-compute). Wszystko z Ollama + Common Crawl + free Google/Bing APIs. **Zero subskrypcji**. | v1.1.0 ✓ |
+
+## Architektura "Bake & Forget"
+
+Plugin core nie wymaga Ollamy w runtime. Cały AI-driven content jest **pre-computed raz** przy wdrożeniu i zapisany jako statyczne JSON-y. Klient deployuje folder `seo-bake/` razem ze stroną i **strona żyje własnym życiem** — bez LLM, bez subskrypcji, bez połączenia z autopilotem.
+
+```bash
+# U Nicolasa, raz przy wdrożeniu (Ollama lokalnie):
+npx s2m-autopilot bake --site https://klient.pl --out ./seo-bake/
+
+# Klient deployuje folder + plugin core:
+const s2m = createSiteToMcp({ siteUrl, brand, bakedDir: './seo-bake' });
+
+# Co kwartał refresh (tylko zmienione strony):
+npx s2m-autopilot bake --refresh
+```
+
+Pełen workflow: **[docs/BAKING.md](docs/BAKING.md)**.
 
 ## Quick start
 

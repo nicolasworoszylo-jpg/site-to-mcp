@@ -24,6 +24,7 @@ import { resolve } from 'node:path';
 import { createSiteToMcp, type SiteToMcpConfig } from '@vidok/site-to-mcp';
 import { createAutopilot } from '../factory.js';
 import { generateLaunchAgentPlist } from '../scheduler/launchagent.js';
+import { BakeOrchestrator } from '../bake/orchestrator.js';
 import type { AutopilotConfig } from '../types.js';
 
 const COLORS = {
@@ -172,6 +173,44 @@ async function main(): Promise<void> {
         await new Promise(() => {});
         break;
       }
+      case 'bake': {
+        const site = (flags['site'] as string) ?? cfg.s2m.config.siteUrl;
+        const outDir = (flags['out'] as string) ?? './seo-bake';
+        const maxPages = Number(flags['max'] ?? 100);
+        const refresh = flags['refresh'] === true || flags['refresh'] === 'true';
+        const modulesStr = flags['modules'] as string | undefined;
+        const modules = modulesStr ? (modulesStr.split(',').filter(Boolean) as Array<'alt' | 'rewrite' | 'faq' | 'schema' | 'markdown'>) : undefined;
+
+        console.log(color('bold', '▸ Baking site → static files'));
+        console.log(color('dim', `  Site: ${site}`));
+        console.log(color('dim', `  Out: ${outDir}`));
+        console.log(color('dim', `  Max pages: ${maxPages}`));
+        if (refresh) console.log(color('dim', `  Refresh mode: only changed pages`));
+        if (modules) console.log(color('dim', `  Modules: ${modules.join(', ')}`));
+
+        const orchestrator = new BakeOrchestrator(cfg.s2m, cfg);
+        const manifest = await orchestrator.bake({
+          site,
+          outDir,
+          maxPages,
+          refresh,
+          ...(modules ? { modules } : {}),
+        });
+
+        console.log();
+        console.log(color('green', `✓ Bake complete`));
+        console.log(`  ${manifest.totalPages} pages, ${manifest.totalImages} images`);
+        console.log(`  ${manifest.staticFiles.length} static files generated`);
+        console.log(`  ${Math.round(manifest.durationMs / 1000)}s total`);
+        console.log();
+        console.log(color('bold', 'Deploy this folder:'));
+        console.log(`  ${outDir}`);
+        console.log();
+        console.log(color('bold', 'Use in your app:'));
+        console.log(color('cyan', `  const s2m = createSiteToMcp({ siteUrl, brand, bakedDir: '${outDir}' });`));
+        console.log(color('dim', `  Strona "żyje własnym życiem" — zero LLM runtime, zero subskrypcji.`));
+        break;
+      }
       case 'launchagent': {
         const label = (flags['label'] as string) ?? 'pl.vidok.s2m-autopilot';
         const interval = Number(flags['interval'] ?? 3600);
@@ -210,6 +249,10 @@ function printHelp(): void {
   console.log(`${color('bold', 's2m-autopilot')} ${color('dim', 'v1.0.0')} — Zero-subscription SEO automation
 
 ${color('bold', 'Komendy:')}
+  bake [--site URL] [--out DIR]       Pre-compute WSZYSTKO na statyczne pliki (Ollama wymagana)
+                                      Po bake strona "żyje własnym życiem" bez LLM
+       [--max N] [--refresh]
+       [--modules alt,rewrite,faq,schema,markdown]
   health                              Status Ollama + free APIs
   run <module> [--opts json]          Uruchom dowolny moduł
   keyword-research <seed> [--max N]   Google Autosuggest scrape

@@ -42,6 +42,7 @@ import {
 } from './core/llms-txt/index.js';
 import { MCPServer, PageIndex } from './core/mcp-server/index.js';
 import { Monitor } from './core/monitoring/index.js';
+import { BakedContentReader, loadBakedContent } from './core/baked/index.js';
 
 const DEFAULT_AI_BOTS: SiteToMcpConfig['aiBots'] = {
   // training - default disallow
@@ -67,8 +68,17 @@ const DEFAULT_AI_BOTS: SiteToMcpConfig['aiBots'] = {
 export class SiteToMcp {
   readonly config: SiteToMcpConfig;
   readonly pageIndex: PageIndex;
+  /**
+   * Pre-computed baked content reader.
+   *
+   * Jeśli `bakedDir` jest w configu — plugin czyta pre-built llms.txt/schema/markdown/alt
+   * z dysku zamiast generować na fly. Strona "żyje własnym życiem", zero LLM runtime.
+   *
+   * null = bake nie skonfigurowany / pliki nieobecne — fallback do dynamic generation.
+   */
+  readonly baked: BakedContentReader | null;
 
-  constructor(config: Partial<SiteToMcpConfig> & Pick<SiteToMcpConfig, 'siteUrl' | 'brand'>) {
+  constructor(config: Partial<SiteToMcpConfig> & Pick<SiteToMcpConfig, 'siteUrl' | 'brand'> & { bakedDir?: string }) {
     this.config = {
       siteUrl: config.siteUrl,
       brand: config.brand,
@@ -95,6 +105,24 @@ export class SiteToMcp {
       },
     };
     this.pageIndex = new PageIndex();
+    this.baked = config.bakedDir ? loadBakedContent(config.bakedDir) : null;
+
+    // Jeśli bake załadowany — automatyczne dodanie wszystkich stron do pageIndex
+    if (this.baked) {
+      for (const path of this.baked.listPaths()) {
+        const page = this.baked.getPage(path);
+        if (!page) continue;
+        this.pageIndex.add({
+          url: page.url,
+          path: page.path,
+          title: page.optimized?.title ?? page.title,
+          ...(page.description ? { description: page.description } : {}),
+          tokens: page.markdownTokens,
+          preview: { headings: [{ level: 1, text: page.optimized?.h1 ?? page.title }] },
+          full: undefined,
+        });
+      }
+    }
   }
 
   /**
@@ -147,6 +175,11 @@ export class SiteToMcp {
   // ==========================================================================
 
   generateLlmsTxt(input?: Partial<LlmsTxtInput>): string {
+    // Prefer baked (pre-computed at deploy time — zero runtime cost)
+    if (this.baked && !input) {
+      const baked = this.baked.getStaticFile('llms.txt');
+      if (baked) return baked;
+    }
     const pages = this.pageIndex.list();
     const sections = input?.sections ?? [
       {
@@ -168,6 +201,10 @@ export class SiteToMcp {
   }
 
   generateRobotsTxt(input?: Partial<RobotsTxtInput>): string {
+    if (this.baked && !input) {
+      const baked = this.baked.getStaticFile('robots.txt');
+      if (baked) return baked;
+    }
     return generateRobotsTxt({
       siteUrl: this.config.siteUrl,
       aiBots: this.config.aiBots,
@@ -177,6 +214,10 @@ export class SiteToMcp {
   }
 
   generateSitemapXml(entries?: SitemapEntry[]): string {
+    if (this.baked && !entries) {
+      const baked = this.baked.getStaticFile('sitemap.xml');
+      if (baked) return baked;
+    }
     const items =
       entries ??
       this.pageIndex.list().map(
@@ -199,12 +240,24 @@ export class SiteToMcp {
    * Cap default 28k tokens (poniżej 30k Osmani limit).
    */
   generateLlmsFullTxt(input?: Partial<LlmsFullInput>): { content: string; truncated: boolean; totalTokens: number } {
-    const pages = this.pageIndex.list().map((p) => ({
-      url: p.url,
-      title: p.title,
-      markdown: p.full?.markdown ?? p.preview.firstParagraph ?? '',
-      tokens: p.tokens,
-    }));
+    if (this.baked && !input) {
+      const baked = this.baked.getStaticFile('llms-full.txt');
+      if (baked) {
+        return { content: baked, truncated: false, totalTokens: Math.ceil(baked.length / 4) };
+      }
+    }
+    // Z baked: prefer pre-computed markdown per page
+    const pages = this.baked
+      ? this.baked.listPaths().map((path) => {
+          const p = this.baked!.getPage(path)!;
+          return { url: p.url, title: p.title, markdown: p.markdown, tokens: p.markdownTokens };
+        })
+      : this.pageIndex.list().map((p) => ({
+          url: p.url,
+          title: p.title,
+          markdown: p.full?.markdown ?? p.preview.firstParagraph ?? '',
+          tokens: p.tokens,
+        }));
     return generateLlmsFullTxt({
       siteName: this.config.brand.name,
       pages,
@@ -227,6 +280,10 @@ export class SiteToMcp {
   }
 
   generateAgentCard(input?: Partial<AgentCardInput>): string {
+    if (this.baked && !input) {
+      const baked = this.baked.getStaticFile('.well-known/agent-card.json');
+      if (baked) return baked;
+    }
     return generateAgentCard({
       name: this.config.brand.name,
       description: this.config.brand.description ?? '',
@@ -239,6 +296,47 @@ export class SiteToMcp {
       ...(this.config.brand.contact?.email ? { contact: { email: this.config.brand.contact.email } } : {}),
       ...input,
     });
+  }
+
+  /**
+   * Schema graph dla konkretnej strony.
+   * Z baked → instant lookup. Bez baked → buduje dynamicznie z arg.
+   */
+  getSchemaForPage(path: string, fallback?: SchemaBundleInput): SchemaBundleOutput | null {
+    if (this.baked) {
+      const graph = this.baked.getSchemaGraph(path);
+      if (graph) {
+        const scriptTag = `<script type="application/ld+json">\n${JSON.stringify(graph).replace(/<\/(script)/gi, '<\\/$1')}\n</script>`;
+        return { graph, scriptTag, types: extractSchemaTypes(graph) };
+      }
+    }
+    if (fallback) return this.buildSchema(fallback);
+    return null;
+  }
+
+  /**
+   * Markdown dla AI bot content negotiation.
+   * Z baked → instant. Bez → wymaga rawHtml (dynamic).
+   */
+  getMarkdownForPage(path: string, fallbackHtml?: string): { content: string; tokens: number } | null {
+    if (this.baked) {
+      const md = this.baked.getMarkdown(path);
+      if (md) return md;
+    }
+    if (fallbackHtml) {
+      const url = new URL(path, this.config.siteUrl).toString();
+      const extracted = extractContent({ url, html: fallbackHtml });
+      return { content: extracted.markdown, tokens: Math.ceil(extracted.markdown.length / 4) };
+    }
+    return null;
+  }
+
+  /**
+   * Alt text dla obrazu (z baked cache).
+   */
+  getAltForImage(imageSrc: string, pagePath?: string): string | null {
+    if (!this.baked) return null;
+    return this.baked.getAltText(imageSrc, pagePath);
   }
 
   generateHeadersFile(allowTraining = false): string {
@@ -289,6 +387,27 @@ export class SiteToMcp {
   }
 }
 
-export function createSiteToMcp(config: Partial<SiteToMcpConfig> & Pick<SiteToMcpConfig, 'siteUrl' | 'brand'>): SiteToMcp {
+export function createSiteToMcp(config: Partial<SiteToMcpConfig> & Pick<SiteToMcpConfig, 'siteUrl' | 'brand'> & { bakedDir?: string }): SiteToMcp {
   return new SiteToMcp(config);
+}
+
+/**
+ * Helper: wyciąga listę @type z graph.
+ */
+function extractSchemaTypes(graph: Record<string, unknown>): string[] {
+  const out = new Set<string>();
+  const visit = (node: unknown): void => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    const t = obj['@type'];
+    if (typeof t === 'string') out.add(t);
+    if (Array.isArray(t)) t.forEach((x) => typeof x === 'string' && out.add(x));
+    Object.values(obj).forEach(visit);
+  };
+  visit(graph);
+  return [...out];
 }
